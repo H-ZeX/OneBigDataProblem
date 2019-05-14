@@ -5,10 +5,23 @@ import util.Util;
 import java.io.*;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class Split {
+    public static class LineParseResult {
+        private boolean ok;
+        private String str;
+        private long number;
+
+        public LineParseResult(boolean ok, String str, long number) {
+            this.ok = ok;
+            this.str = str;
+            this.number = number;
+        }
+    }
+
     private final long RESERVED_MEM_SIZE;
 
     /*
@@ -18,6 +31,7 @@ public class Split {
     private FileOutputStream[] outputs;
     private BufferedReader reader;
     private Function<String, Integer> hashFunc;
+    private BiFunction<String, Long, LineParseResult> lineParser;
     private ArrayBlockingQueue<String> buffer;
 
     /**
@@ -32,6 +46,7 @@ public class Split {
     public Split(String name, String inputFileName,
                  String[] outputDirs,
                  Function<String, Integer> hashFunc,
+                 BiFunction<String, Long, LineParseResult> lineParser,
                  long reverseMemSize,
                  int bufferSize)
             throws Exception {
@@ -46,6 +61,7 @@ public class Split {
         this.containers = new HashMap[partCnt];
         this.reader = new BufferedReader(new FileReader(inputFileName));
         this.hashFunc = (x) -> (hashFunc.apply(x) % partCnt + partCnt) % partCnt;
+        this.lineParser = lineParser;
         this.buffer = new ArrayBlockingQueue<>(bufferSize);
 
         for (int i = 0; i < partCnt; i++) {
@@ -83,12 +99,16 @@ public class Split {
                 break;
             }
             num++;
-            int hash = this.hashFunc.apply(line);
+            LineParseResult r = lineParser.apply(line, num);
+            if (!r.ok) {
+                continue;
+            }
+            int hash = this.hashFunc.apply(r.str);
             HashMap<String, Long> m = containers[hash];
-            if (m.containsKey(line)) {
-                m.put(line, -1L);
+            if (m.containsKey(r.str)) {
+                m.put(r.str, -1L);
             } else {
-                m.put(line, num);
+                m.put(r.str, r.number);
             }
             if (Util.availableMemory() < RESERVED_MEM_SIZE) {
                 flushToDisk();

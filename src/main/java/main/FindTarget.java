@@ -7,16 +7,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class FindTarget {
     private final static long ALL_MEM = Runtime.getRuntime().maxMemory();
-    private final static long FILTER_MEM = (long) (Math.ceil(ALL_MEM * 0.6));
+    private final static long FILE_SIZE_TO_FILTER = (long) (Math.ceil(ALL_MEM * 0.6));
     private final static long FREE_MEM_LOW_BOUND = (long) (ALL_MEM * 0.15);
     private final static int MIN_BUF_CAPACITY = 1024;
     private final static int BUF_CAPACITY;
-
     // The cnt of split round, if over this number,
     // exit and report that this program is not competent.
     private final static int MAX_SPLIT_ROUND_CNT = 5;
@@ -29,8 +29,8 @@ public class FindTarget {
         int tmp = (int) (ALL_MEM * 0.05) / 200;
         BUF_CAPACITY = tmp < MIN_BUF_CAPACITY ? MIN_BUF_CAPACITY : tmp;
 
-        HASH_FUNC_SET[0] = (x) -> 1; // String::hashCode;
-        HASH_FUNC_SET[1] = (x) -> 1; /*(x) -> {
+        HASH_FUNC_SET[0] = String::hashCode;
+        HASH_FUNC_SET[1] = (x) -> {
             if (x.length() <= 1) {
                 return x.length() == 0 ? 0 : (int) x.charAt(0);
             } else {
@@ -38,7 +38,7 @@ public class FindTarget {
                 return x.substring(0, l1).hashCode()
                         + x.substring(l1).hashCode();
             }
-        };*/
+        };
         HASH_FUNC_SET[2] = (x) -> {
             if (x.length() <= 2) {
                 int hash = 0;
@@ -90,7 +90,11 @@ public class FindTarget {
         final Param param = checkAndParseParam(args);
         final String splitBaseName = "split_1";
 
-        split(splitBaseName, param.inputFile, param.middleDir, param.partCnt, HASH_FUNC_SET[0]);
+        split(splitBaseName, param.inputFile,
+                param.middleDir, param.partCnt,
+                HASH_FUNC_SET[0],
+                (line, number) -> new Split.LineParseResult(true, line, number)
+        );
         recurseSplit(splitBaseName, param.middleDir);
         filterRes(param.middleDir);
     }
@@ -102,28 +106,40 @@ public class FindTarget {
         // Be careful that, the new file gene by split will in the same dir,
         // so it MUST not has same name as others.
         // So the split name should be construct carefully.
-        boolean ok = true;
+        boolean ok;
         int roundCnt = 0;
         do {
+            ok = true;
             roundCnt++;
-            Logger.getGlobal().info("recurse split: " + roundCnt);
             if (roundCnt >= MAX_SPLIT_ROUND_CNT) {
                 throw new Exception("This program is not competent for this job.");
             }
             File[] files = new File(middleDir).listFiles();
             assert files != null;
-            for (File x : files) {
-                if (x.length() <= FILTER_MEM) {
+            for (int i = 0; i < files.length; i++) {
+                File x = files[i];
+                if (x.length() <= FILE_SIZE_TO_FILTER) {
                     continue;
                 }
-                Logger.getGlobal().info("recurse split " + x.getAbsolutePath());
+                Logger.getGlobal().info("recurse split, fileSize: " + x.length()
+                        + ", fileName: " + x.getAbsolutePath()
+                        + ", file_size_to_filter: " + FILE_SIZE_TO_FILTER);
                 ok = false;
-                int partCnt = (int) Math.ceil(x.length() * 1.0 / FILTER_MEM);
-                split(splitBaseName + "_" + roundCnt,
+                int partCnt = (int) Math.ceil(x.length() * 1.0 / FILE_SIZE_TO_FILTER);
+                split(splitBaseName + "_" + roundCnt + "_" + i,
                         x.getAbsolutePath(),
                         middleDir, partCnt,
-                        HASH_FUNC_SET[roundCnt]
+                        HASH_FUNC_SET[roundCnt],
+                        (line, num) -> {
+                            int ind = line.lastIndexOf("\t");
+                            int ind2 = line.lastIndexOf("\t", ind - 1);
+                            String str = line.substring(0, ind2);
+                            long n = Long.parseLong(line.substring(ind2, ind).trim());
+                            int cnt = Integer.parseInt(line.substring(ind).trim());
+                            return new Split.LineParseResult(cnt == 1, str, n);
+                        }
                 );
+                Logger.getGlobal().info("delete " + x);
                 if (!x.delete()) {
                     throw new Exception("delete middle file(" + x.getAbsolutePath() + ") failed");
                 }
@@ -135,13 +151,15 @@ public class FindTarget {
                               String inputFileName,
                               String outputDir,
                               int partCnt,
-                              Function<String, Integer> hashFunc)
+                              Function<String, Integer> hashFunc,
+                              BiFunction<String, Long, Split.LineParseResult> lineParser)
             throws Exception {
         String[] outputDirs = new String[partCnt];
         for (int i = 0; i < partCnt; i++) {
             outputDirs[i] = outputDir;
         }
-        final Split split = new Split(splitName, inputFileName, outputDirs, hashFunc, FindTarget.FREE_MEM_LOW_BOUND, FindTarget.BUF_CAPACITY);
+        final Split split = new Split(splitName, inputFileName, outputDirs,
+                hashFunc, lineParser, FREE_MEM_LOW_BOUND, BUF_CAPACITY);
         split.start();
     }
 
@@ -207,7 +225,7 @@ public class FindTarget {
             }
         }
         long len = new File(inputFile).length();
-        int partCnt = (int) (Math.ceil(len * 1.0 / FILTER_MEM) + 1);
+        int partCnt = (int) (Math.ceil(len * 1.0 / FILE_SIZE_TO_FILTER) + 1);
         partCnt = partCnt < 10 ? 10 : partCnt;
         Logger.getGlobal().info("init, split to " + partCnt + " parts");
         return new Param(partCnt, inputFile, middleDir);
