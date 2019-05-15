@@ -32,57 +32,71 @@ public class FindTarget {
 
         HASH_FUNC_SET[0] = String::hashCode;
         HASH_FUNC_SET[1] = (x) -> {
+            // This is not same as String::hashCode.
+            BiFunction<Integer, Integer, Integer> hash = (a, b) -> {
+                int h = 0;
+                for (int i = a; i < b; i++) {
+                    h = 31 * h + (x.charAt(i) & 0xff);
+                }
+                return h;
+            };
             if (x.length() <= 1) {
                 return x.length() == 0 ? 0 : (int) x.charAt(0);
             } else {
                 int l1 = x.length() / 2;
-                return x.substring(0, l1).hashCode()
-                        + x.substring(l1).hashCode();
+                return hash.apply(0, l1) + hash.apply(l1, x.length());
             }
         };
         HASH_FUNC_SET[2] = (x) -> {
-            if (x.length() <= 2) {
-                int hash = 0;
-                for (int i = 0; i < x.length(); i++) {
-                    hash += x.charAt(i);
+            BiFunction<Integer, Integer, Integer> hash = (a, b) -> {
+                int h = 0;
+                for (int i = a; i < b; i++) {
+                    h = 31 * h + (x.charAt(i) & 0xff);
                 }
-                return hash;
+                return h;
+            };
+            if (x.length() <= 2) {
+                int h = 0;
+                for (int i = 0; i < x.length(); i++) {
+                    h += x.charAt(i);
+                }
+                return h;
             } else {
                 int l1 = x.length() / 3;
-                return x.substring(0, l1).hashCode()
-                        + x.substring(l1 + l1 * 2).hashCode()
-                        + x.substring(l1 * 2).hashCode();
+                int h = 0;
+                for (int i = 0; i < 3; i++) {
+                    h += hash.apply(i * l1, i * l1 + l1);
+                }
+                if (3 * l1 < x.length()) {
+                    h += hash.apply(3 * l1, x.length());
+                }
+                return h;
             }
         };
         HASH_FUNC_SET[3] = (x) -> {
-            if (x.length() <= 3) {
-                int hash = 0;
-                for (int i = 0; i < x.length(); i++) {
-                    hash += x.charAt(i);
+            BiFunction<Integer, Integer, Integer> hash = (a, b) -> {
+                int h = 0;
+                for (int i = a; i < b; i++) {
+                    h = 31 * h + (x.charAt(i) & 0xff);
                 }
-                return hash;
+                return h;
+            };
+            if (x.length() <= 3) {
+                int h = 0;
+                for (int i = 0; i < x.length(); i++) {
+                    h += x.charAt(i);
+                }
+                return h;
             } else {
                 int l1 = x.length() / 4;
-                return x.substring(0, l1).hashCode()
-                        + x.substring(l1 + l1 * 2).hashCode()
-                        + x.substring(l1 * 2, l1 * 3).hashCode()
-                        + x.substring(l1 * 3).hashCode();
-            }
-        };
-        HASH_FUNC_SET[4] = (x) -> {
-            if (x.length() <= 4) {
-                int hash = 0;
-                for (int i = 0; i < x.length(); i++) {
-                    hash += x.charAt(i);
+                int h = 0;
+                for (int i = 0; i < 4; i++) {
+                    h += hash.apply(i * l1, i * l1 + l1);
                 }
-                return hash;
-            } else {
-                int l1 = x.length() / 5;
-                return x.substring(0, l1).hashCode()
-                        + x.substring(l1 + l1 * 2).hashCode()
-                        + x.substring(l1 * 2, l1 * 3).hashCode()
-                        + x.substring(l1 * 3, l1 * 4).hashCode()
-                        + x.substring(l1 * 4).hashCode();
+                if (4 * l1 < x.length()) {
+                    h += hash.apply(4 * l1, x.length());
+                }
+                return h;
             }
         };
     }
@@ -108,7 +122,7 @@ public class FindTarget {
     public String work(String splitBaseName, String inputFile,
                        String middleDir) throws Exception {
         checkParam(inputFile, middleDir);
-        int partCnt = (int) (Math.ceil(new File(inputFile).length() * 1.0 / MIDDLE_FILE_SIZE) + 1);
+        int partCnt = (int) Math.ceil(new File(inputFile).length() * 1.0 / MIDDLE_FILE_SIZE);
         Logger.getGlobal().info("first split, split to " + partCnt + " parts");
         split(splitBaseName, inputFile,
                 middleDir, partCnt,
