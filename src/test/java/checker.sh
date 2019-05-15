@@ -5,4 +5,4 @@ if [[ $# -lt 2 ]]; then
 fi
 
 cd /home/hzx/IdeaProjects/PingCapHW2/out/test/classes/
-/media/hzx/infrastructure/BIN/jdk1.8.0_191/bin/java -ea -Xms512m -Xmx4096m operator.Checker $1  $2
+/media/hzx/infrastructure/BIN/jdk-11.0.1/bin/java -ea -Xms512m -Xmx4096m operator.Checker $1  $2

@@ -8,8 +8,8 @@ import java.util.*;
 public class AllTest {
     @Test
     public void test1() throws Exception {
-        final int maxWordCnt = 100;
-        final int maxWordSize = 10;
+        final int maxWordCnt = 10240;
+        final int maxWordSize = 100;
         final int minWordSize = 1;
         final int testCnt = 10;
         final String outputDir = "/tmp/split_tests/";
@@ -22,7 +22,8 @@ public class AllTest {
             renderFile(rng.nextInt(maxWordCnt), maxWordSize, minWordSize, rng, material, result);
             Split split = new Split(splitName, material,
                     new String[]{outputDir, outputDir, outputDir, outputDir, outputDir, outputDir, outputDir},
-                    String::hashCode, 128L * 1024 * 1024, 32 * 1024 * 1024);
+                    String::hashCode, (line, num) -> new Split.LineParseResult(true, line, num),
+                    128L * 1024 * 1024, 32 * 1024 * 1024);
             split.start();
 
             Process checker = Runtime.getRuntime().exec("/home/hzx/IdeaProjects/PingCapHW2/src/test/java/checker.sh "

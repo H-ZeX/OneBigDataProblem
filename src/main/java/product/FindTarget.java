@@ -1,4 +1,4 @@
-package main;
+package product;
 
 import operator.Filter;
 import operator.Split;
@@ -6,25 +6,26 @@ import operator.Split;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class FindTarget {
-    private final static long ALL_MEM = Runtime.getRuntime().maxMemory();
-    private final static long FILE_SIZE_TO_FILTER = (long) (Math.ceil(ALL_MEM * 0.6));
-    private final static long FREE_MEM_LOW_BOUND = (long) (ALL_MEM * 0.15);
-    private final static int MIN_BUF_CAPACITY = 1024;
-    private final static int BUF_CAPACITY;
+    private final long ALL_MEM = Runtime.getRuntime().maxMemory();
+    private final long DEFAULT_MIDDLE_FILE_SIZE = (long) (Math.ceil(ALL_MEM * 0.75));
+    private final long DEFAULT_FREE_MEM_LOW_BOUND = (long) (ALL_MEM * 0.1);
+    private final int MIN_BUF_CAPACITY = 1024;
+    private final long MIDDLE_FILE_SIZE;
+    private final long FREE_MEM_LOW_BOUND;
+    private final int BUF_CAPACITY;
     // The cnt of split round, if over this number,
     // exit and report that this program is not competent.
-    private final static int MAX_SPLIT_ROUND_CNT = 5;
+    private final int MAX_SPLIT_ROUND_CNT = 5;
     @SuppressWarnings("unchecked")
-    private final static Function<String, Integer>[] HASH_FUNC_SET =
+    private final Function<String, Integer>[] HASH_FUNC_SET =
             (Function<String, Integer>[]) new Function[MAX_SPLIT_ROUND_CNT];
 
-    static {
+    {
         // Assume that every string's avg len is 100, then its size is 200.
         int tmp = (int) (ALL_MEM * 0.05) / 200;
         BUF_CAPACITY = tmp < MIN_BUF_CAPACITY ? MIN_BUF_CAPACITY : tmp;
@@ -86,23 +87,53 @@ public class FindTarget {
         };
     }
 
-    public static void main(String[] args) throws Exception {
-        final Param param = checkAndParseParam(args);
-        final String splitBaseName = "split_1";
+    /**
+     * If the two param is not legal, they will be set to default value.
+     */
+    public FindTarget(long middleFileSize, long freeMemLowBound) {
+        if (middleFileSize <= 0 || middleFileSize >= ALL_MEM) {
+            this.MIDDLE_FILE_SIZE = DEFAULT_MIDDLE_FILE_SIZE;
+        } else {
+            this.MIDDLE_FILE_SIZE = middleFileSize;
+        }
+        if (freeMemLowBound <= 0 || freeMemLowBound >= ALL_MEM) {
+            this.FREE_MEM_LOW_BOUND = DEFAULT_FREE_MEM_LOW_BOUND;
+        } else {
+            this.FREE_MEM_LOW_BOUND = freeMemLowBound;
+        }
+        Logger.getGlobal().info("middleFileSize: " + this.MIDDLE_FILE_SIZE
+                + ", freeMemLowBound: " + this.FREE_MEM_LOW_BOUND);
+    }
 
-        split(splitBaseName, param.inputFile,
-                param.middleDir, param.partCnt,
+    public String work(String splitBaseName, String inputFile,
+                       String middleDir) throws Exception {
+        checkParam(inputFile, middleDir);
+        int partCnt = (int) (Math.ceil(new File(inputFile).length() * 1.0 / MIDDLE_FILE_SIZE) + 1);
+        Logger.getGlobal().info("first split, split to " + partCnt + " parts");
+        split(splitBaseName, inputFile,
+                middleDir, partCnt,
                 HASH_FUNC_SET[0],
                 (line, number) -> new Split.LineParseResult(true, line, number)
         );
-        recurseSplit(splitBaseName, param.middleDir);
-        filterRes(param.middleDir);
+        recurseSplit(splitBaseName, middleDir);
+        return filterRes(middleDir);
     }
 
-    private static void recurseSplit(String splitBaseName,
-                                     String middleDir)
-            throws Exception {
+    private void checkParam(String inputFile, String middleDir) {
+        File input = new File(inputFile);
+        File middle = new File(middleDir);
+        if (!input.exists() || input.isDirectory()) {
+            throw new IllegalArgumentException(inputFile + " should exist and should not be directory");
+        }
+        File[] files = middle.listFiles();
+        if (!middle.isDirectory() || files.length > 0) {
+            throw new IllegalArgumentException(middleDir + " should be dir, and should be empty");
+        }
+    }
 
+    private void recurseSplit(String splitBaseName,
+                              String middleDir)
+            throws Exception {
         // Be careful that, the new file gene by split will in the same dir,
         // so it MUST not has same name as others.
         // So the split name should be construct carefully.
@@ -118,14 +149,14 @@ public class FindTarget {
             assert files != null;
             for (int i = 0; i < files.length; i++) {
                 File x = files[i];
-                if (x.length() <= FILE_SIZE_TO_FILTER) {
+                if (x.length() <= MIDDLE_FILE_SIZE) {
                     continue;
                 }
-                Logger.getGlobal().info("recurse split, fileSize: " + x.length()
+                Logger.getGlobal().info("recurse split: " + roundCnt + ", fileSize: " + x.length()
                         + ", fileName: " + x.getAbsolutePath()
-                        + ", file_size_to_filter: " + FILE_SIZE_TO_FILTER);
+                        + ", file_size_to_filter: " + MIDDLE_FILE_SIZE);
                 ok = false;
-                int partCnt = (int) Math.ceil(x.length() * 1.0 / FILE_SIZE_TO_FILTER);
+                int partCnt = (int) Math.ceil(x.length() * 1.0 / MIDDLE_FILE_SIZE);
                 split(splitBaseName + "_" + roundCnt + "_" + i,
                         x.getAbsolutePath(),
                         middleDir, partCnt,
@@ -147,12 +178,12 @@ public class FindTarget {
         } while (!ok);
     }
 
-    private static void split(String splitName,
-                              String inputFileName,
-                              String outputDir,
-                              int partCnt,
-                              Function<String, Integer> hashFunc,
-                              BiFunction<String, Long, Split.LineParseResult> lineParser)
+    private void split(String splitName,
+                       String inputFileName,
+                       String outputDir,
+                       int partCnt,
+                       Function<String, Integer> hashFunc,
+                       BiFunction<String, Long, Split.LineParseResult> lineParser)
             throws Exception {
         String[] outputDirs = new String[partCnt];
         for (int i = 0; i < partCnt; i++) {
@@ -163,7 +194,7 @@ public class FindTarget {
         split.start();
     }
 
-    private static void filterRes(String outputDir)
+    private String filterRes(String outputDir)
             throws IOException, InterruptedException {
         final ArrayList<Filter.Result> res = new ArrayList<>();
         final File[] files = new File(outputDir).listFiles();
@@ -181,53 +212,6 @@ public class FindTarget {
                 rn = x.number;
             }
         }
-        System.out.println(rs == null ? "Not found" : rs);
-    }
-
-    private static class Param {
-        private int partCnt;
-        private String inputFile;
-        private String middleDir;
-
-        Param(int partCnt, String inputFile, String middleDir) {
-            this.partCnt = partCnt;
-            this.inputFile = inputFile;
-            this.middleDir = middleDir;
-        }
-    }
-
-    private static Param checkAndParseParam(String[] args) {
-        if (args.length != 2) {
-            System.out.println("usage: ftw <inputFileName> <middleDir>" +
-                    "\nMake sure that the middleDir is empty, or it is not exist");
-            System.exit(0);
-        }
-        final String inputFile = args[0];
-        final String middleDir = args[1];
-
-        if (!new File(inputFile).exists()) {
-            System.err.println(inputFile + " does not exist");
-            System.exit(1);
-        }
-        final File dir = new File(middleDir);
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                System.err.println("Can not create middleDir");
-                System.exit(1);
-            }
-        } else {
-            if (!dir.isDirectory()) {
-                System.err.println("The middleDir is not dir");
-                System.exit(1);
-            } else if (Objects.requireNonNull(dir.listFiles()).length != 0) {
-                System.err.println("The middleDir should not has other files");
-                System.exit(1);
-            }
-        }
-        long len = new File(inputFile).length();
-        int partCnt = (int) (Math.ceil(len * 1.0 / FILE_SIZE_TO_FILTER) + 1);
-        partCnt = partCnt < 10 ? 10 : partCnt;
-        Logger.getGlobal().info("init, split to " + partCnt + " parts");
-        return new Param(partCnt, inputFile, middleDir);
+        return (rs == null ? "Not found" : rs);
     }
 }

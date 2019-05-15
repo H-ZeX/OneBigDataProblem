@@ -123,7 +123,7 @@ public class Split {
     }
 
     private void flushToDisk() throws IOException {
-        Logger.getGlobal().info("Flush to disk");
+        Logger.getGlobal().info("Flush to disk, availableMem: " + Util.availableMemory() / 1024.0 / 1024.0 + "MB");
         for (int i = 0; i < containers.length; i++) {
             for (String x : containers[i].keySet()) {
                 Long value = containers[i].get(x);
@@ -135,7 +135,7 @@ public class Split {
                 outputs[i].write("\n".getBytes());
             }
             containers[i] = new HashMap<>();
-            // TODO: should I flush?
+            outputs[i].flush();
         }
         System.gc();
     }
