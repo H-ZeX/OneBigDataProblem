@@ -32,7 +32,6 @@ public class Split {
     private BufferedReader reader;
     private Function<String, Integer> hashFunc;
     private BiFunction<String, Long, LineParseResult> lineParser;
-    private ArrayBlockingQueue<String> buffer;
 
     /**
      * Split the inputFile to outputDirs, one dir one file.
@@ -47,8 +46,7 @@ public class Split {
                  String[] outputDirs,
                  Function<String, Integer> hashFunc,
                  BiFunction<String, Long, LineParseResult> lineParser,
-                 long reverseMemSize,
-                 int bufferSize)
+                 long reverseMemSize)
             throws Exception {
         if (outputDirs.length == 0) {
             throw new IllegalArgumentException("The outputDirs should not be empty");
@@ -62,7 +60,6 @@ public class Split {
         this.reader = new BufferedReader(new FileReader(inputFileName));
         this.hashFunc = (x) -> (hashFunc.apply(x) % partCnt + partCnt) % partCnt;
         this.lineParser = lineParser;
-        this.buffer = new ArrayBlockingQueue<>(bufferSize);
 
         for (int i = 0; i < partCnt; i++) {
             File dir = new File(outputDirs[i]);
@@ -80,22 +77,21 @@ public class Split {
         }
     }
 
-    public void start() throws IOException, InterruptedException {
-        new Thread(() -> {
-            try {
-                Util.reader(this.reader, this.buffer);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
+    public void start() throws IOException {
         work();
     }
 
-    private void work() throws IOException, InterruptedException {
+    private void work() throws IOException {
         long num = -1;
         while (true) {
-            String line = buffer.take();
+            String line = reader.readLine();
+            if (line == null) {
+                break;
+            }
             if (line.length() == 0) {
+                continue;
+            }
+            if (line.charAt(0) == 0) {
                 break;
             }
             num++;
@@ -147,7 +143,6 @@ public class Split {
         for (int i = 0; i < containers.length; i++) {
             containers[i] = null;
         }
-        this.buffer = null;
         this.hashFunc = null;
         this.outputs = null;
         this.reader = null;

@@ -37,7 +37,7 @@ public class AllTest {
             Split split = new Split(splitName, material,
                     new String[]{outputDir, outputDir, outputDir, outputDir, outputDir, outputDir, outputDir},
                     String::hashCode, (line, num) -> new Split.LineParseResult(true, line, num),
-                    128L * 1024 * 1024, 32 * 1024 * 1024);
+                    128L * 1024 * 1024);
             split.start();
 
             Process checker = Runtime.getRuntime().exec("/home/hzx/IdeaProjects/PingCapHW2/src/test/java/checker.sh "
@@ -51,7 +51,7 @@ public class AllTest {
             assert files != null;
             ArrayList<Filter.Result> res = new ArrayList<>();
             for (File x : files) {
-                res.add(Filter.filter(x.getAbsolutePath(), 32 * 1024 * 1024));
+                res.add(Filter.filter(x.getAbsolutePath()));
             }
             String rs = null;
             long rn = Long.MAX_VALUE;

@@ -14,10 +14,8 @@ public class FindTarget {
     private final long ALL_MEM = Runtime.getRuntime().maxMemory();
     private final long DEFAULT_MIDDLE_FILE_SIZE = (long) (Math.ceil(ALL_MEM * 0.75));
     private final long DEFAULT_FREE_MEM_LOW_BOUND = (long) (ALL_MEM * 0.1);
-    private final int MIN_BUF_CAPACITY = 1024;
     private final long MIDDLE_FILE_SIZE;
     private final long FREE_MEM_LOW_BOUND;
-    private final int BUF_CAPACITY;
     // The cnt of split round, if over this number,
     // exit and report that this program is not competent.
     private final int MAX_SPLIT_ROUND_CNT = 5;
@@ -26,10 +24,6 @@ public class FindTarget {
             (Function<String, Integer>[]) new Function[MAX_SPLIT_ROUND_CNT];
 
     {
-        // Assume that every string's avg len is 100, then its size is 200.
-        int tmp = (int) (ALL_MEM * 0.05) / 200;
-        BUF_CAPACITY = tmp < MIN_BUF_CAPACITY ? MIN_BUF_CAPACITY : tmp;
-
         HASH_FUNC_SET[0] = String::hashCode;
         HASH_FUNC_SET[1] = (x) -> {
             // This is not same as String::hashCode.
@@ -204,18 +198,17 @@ public class FindTarget {
             outputDirs[i] = outputDir;
         }
         final Split split = new Split(splitName, inputFileName, outputDirs,
-                hashFunc, lineParser, FREE_MEM_LOW_BOUND, BUF_CAPACITY);
+                hashFunc, lineParser, FREE_MEM_LOW_BOUND);
         split.start();
     }
 
-    private String filterRes(String outputDir)
-            throws IOException, InterruptedException {
+    private String filterRes(String outputDir) throws IOException {
         final ArrayList<Filter.Result> res = new ArrayList<>();
         final File[] files = new File(outputDir).listFiles();
         assert files != null;
         for (int i = 0; i < files.length; i++) {
             File p = files[i];
-            res.add(Filter.filter(p.getAbsolutePath(), BUF_CAPACITY));
+            res.add(Filter.filter(p.getAbsolutePath()));
             Logger.getGlobal().info("End " + i + "'s filter");
         }
         String rs = null;

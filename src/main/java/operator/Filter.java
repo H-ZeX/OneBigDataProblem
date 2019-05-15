@@ -1,10 +1,9 @@
 package operator;
 
-import util.Util;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.concurrent.ArrayBlockingQueue;
 
 public class Filter {
     public static class Result {
@@ -31,26 +30,22 @@ public class Filter {
         }
     }
 
-    public static Result filter(String inputFile, int bufferSize)
-            throws IOException, InterruptedException {
-        BufferedReader reader = new BufferedReader(new FileReader(inputFile));
-        ArrayBlockingQueue<String> buffer = new ArrayBlockingQueue<>(bufferSize);
-        new Thread(() -> {
-            try {
-                Util.reader(reader, buffer);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
+    public static Result filter(String inputFile) throws IOException {
 
+        BufferedReader reader = new BufferedReader(new FileReader(inputFile));
         // Map str to number, if number==null, this str is deprecated.
         HashMap<String, Long> map = new HashMap<>();
         while (true) {
-            String line = buffer.take();
-            if (line.length() == 0 || line.charAt(0) == 0) {
+            String line = reader.readLine();
+            if (line == null) {
                 break;
             }
-
+            if (line.length() == 0) {
+                continue;
+            }
+            if (line.charAt(0) == 0) {
+                break;
+            }
             int ind = line.lastIndexOf("\t");
             int ind2 = line.lastIndexOf("\t", ind - 1);
             String str = line.substring(0, ind2);
