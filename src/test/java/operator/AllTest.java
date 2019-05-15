@@ -11,13 +11,27 @@ public class AllTest {
         final int maxWordCnt = 10240;
         final int maxWordSize = 100;
         final int minWordSize = 1;
-        final int testCnt = 10;
-        final String outputDir = "/tmp/split_tests/";
-        final String material = "/tmp/split_test_file_2";
+        final int testCnt = 1;
+        final String outputDir = "/tmp/split_tests____/";
+        final String material = "/tmp/render_file";
         final String splitName = "split_1";
         final Random rng = new Random();
 
         for (int i = 0; i < testCnt; i++) {
+            File output = new File(outputDir);
+            if (!output.exists()) {
+                output.mkdirs();
+            } else {
+                if (!output.isDirectory()) {
+                    output.delete();
+                    output.mkdirs();
+                } else {
+                    File[] files = output.listFiles();
+                    for (File x : files) {
+                        x.delete();
+                    }
+                }
+            }
             String result = TesterUtil.renderWord(rng.nextInt(maxWordSize - minWordSize) + minWordSize, rng);
             renderFile(rng.nextInt(maxWordCnt), maxWordSize, minWordSize, rng, material, result);
             Split split = new Split(splitName, material,
