@@ -70,12 +70,16 @@ public class Split {
             new File(fn).delete();
 
             // Pre allocate the size of file.
-            // However, if not reopen this file, then the file size is not zero.
-            // Which make it hard to know whether it is necessary to recurse split the file.
+            // We don't know the exactly size of this middle file now,
+            // however, its upper bound is equal to the inputFileSize (may be a little larger).
             //
-            // It seems that after new FileOutStream, the file will be truncated.
+            // However, if not reopen this file, then the file size is equal to the size pre allocated.
+            // Which make it hard to know whether it is necessary to recursively split this file.
+            //
+            // It seems that after new FileOutStream(fileName), the file will be truncated.
             // However, I assume that when run this work, there is no other program that
             // compete for the disk's head.
+            // So no other file will take up the size pre allocated for this file.
             RandomAccessFile rf = new RandomAccessFile(fn, "rw");
             rf.setLength(inputFileSize);
             rf.close();
