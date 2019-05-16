@@ -53,7 +53,7 @@
 ### `HashFunction`
 
 - 这个程序允许最多递归split 4次（加上最初的split，就是5次split），第一次split使用的是`String::hashCode`
-- 为了区分同一`HashCode`的不同字符串，并且因为`String::hashCode`不满足结合律，即`hashCode(xy)!=hashCode(x)+hashCode(y)`，所以第n次split分别把原串拆分成n个部分，分别求hashCode后相加，作为该次split的`hashFunction`
+- 为了区分同一`HashCode`的不同字符串，并且因为`String::hashCode`并不是线性的——两个字符串拼接在一起，得到的新的字符串的hashCode并不等于原本的两个字符串的hashCode相加，即`hashCode(xy)!=hashCode(x)+hashCode(y)`，所以第n次split的hashFunction是：把原串等分成n个部分，分别求hashCode后相加
 - 对于具体的场景，用户或许需要根据自己的数据特征定制`hashFunction`以尽可能避免或减少递归split
 
 ### 实测结果
