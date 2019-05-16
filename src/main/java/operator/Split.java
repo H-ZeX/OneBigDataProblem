@@ -134,6 +134,10 @@ public class Split {
         for (int i = 0; i < containers.length; i++) {
             for (String x : containers[i].keySet()) {
                 Long value = containers[i].get(x);
+                // Merge all data and write it one time
+                // can reduce the number of syscall.
+                // However, merge data needs memory and need to construct object.
+                // Writing them directly and letting OS flush it when necessary is better.
                 outputs[i].write(x.getBytes());
                 outputs[i].write("\t".getBytes());
                 outputs[i].write(value.toString().getBytes());
