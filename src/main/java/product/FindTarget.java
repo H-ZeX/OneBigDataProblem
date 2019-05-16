@@ -219,6 +219,6 @@ public class FindTarget {
                 rn = x.number;
             }
         }
-        return (rs == null ? "Not found" : rs);
+        return (rs == null ? "" : rs);
     }
 }
