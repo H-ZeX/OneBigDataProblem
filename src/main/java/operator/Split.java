@@ -46,7 +46,7 @@ public class Split {
                  String[] outputDirs,
                  Function<String, Integer> hashFunc,
                  BiFunction<String, Long, LineParseResult> lineParser,
-                 long reverseMemSize)
+                 long reservedMemSize)
             throws Exception {
         if (outputDirs.length == 0) {
             throw new IllegalArgumentException("The outputDirs should not be empty");
@@ -54,7 +54,7 @@ public class Split {
         final int partCnt = outputDirs.length;
         final long inputFileSize = new File(inputFileName).length();
 
-        this.RESERVED_MEM_SIZE = reverseMemSize;
+        this.RESERVED_MEM_SIZE = reservedMemSize;
         this.outputs = new FileOutputStream[partCnt];
         this.containers = new HashMap[partCnt];
         this.reader = new BufferedReader(new FileReader(inputFileName));
@@ -69,6 +69,13 @@ public class Split {
             String fn = outputDirs[i] + "/" + name + "_" + i;
             new File(fn).delete();
 
+            // Pre allocate the size of file.
+            // However, if not reopen this file, then the file size is not zero.
+            // Which make it hard to know whether it is necessary to recurse split the file.
+            //
+            // It seems that after new FileOutStream, the file will be truncated.
+            // However, I assume that when run this work, there is no other program that
+            // compete for the disk's head.
             RandomAccessFile rf = new RandomAccessFile(fn, "rw");
             rf.setLength(inputFileSize);
             rf.close();
